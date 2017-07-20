@@ -1,7 +1,7 @@
 SHELL=/bin/bash
 
 CXX=g++
-CXXFLAGS=-O3 -march=native -fopenmp
+CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp
 LDFLAGS=-fopenmp -lopenblas
 
 all: run

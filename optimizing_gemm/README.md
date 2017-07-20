@@ -1,4 +1,4 @@
-# Optimizing BLIS
+# Optimizing BLAS
 
 ### (on x86 architectures at least)
 

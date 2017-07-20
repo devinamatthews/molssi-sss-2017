@@ -6,6 +6,7 @@
 
 #include <omp.h>
 
+#define EIGEN_USE_BLAS
 #define EIGEN_NO_DEBUG
 #include <Eigen/Dense>
 
@@ -17,3 +18,4 @@ using matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowM
 void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C);
 
 #endif
+

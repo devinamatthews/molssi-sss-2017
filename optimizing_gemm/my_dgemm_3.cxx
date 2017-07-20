@@ -4,7 +4,7 @@
 #define N_UNROLL 8
 
 /*
- * Compute C = A*B for some subblocks of A, B, and C
+ * Compute C += A*B for some subblocks of A, B, and C
  */
 template <typename MatrixA, typename MatrixB, typename MatrixC>
 void my_dgemm_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
@@ -129,7 +129,7 @@ void my_dgemm_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
 }
 
 /*
- * Compute C = A*B
+ * Compute C += A*B
  */
 void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
 {

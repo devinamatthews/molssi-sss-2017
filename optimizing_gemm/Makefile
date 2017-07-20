@@ -3,7 +3,6 @@ SHELL=/bin/bash
 CXX=g++
 CXXFLAGS=-O3 -march=native -fopenmp
 LDFLAGS=-fopenmp -lopenblas
-CXXFLAGS+=-I/Users/dmatthews/src
 
 all: run
 

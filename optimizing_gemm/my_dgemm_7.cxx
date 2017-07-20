@@ -11,7 +11,7 @@
 #define K_UNROLL 4
 
 /*
- * Compute C = A*B for some really tiny subblocks of A, B, and C
+ * Compute C += A*B for some really tiny subblocks of A, B, and C
  */
 template <typename MatrixC>
 void my_dgemm_micro_kernel(int k, const double* A, const double* B, MatrixC& C)
@@ -131,7 +131,7 @@ void my_dgemm_micro_kernel(int k, const double* A, const double* B, MatrixC& C)
 }
 
 /*
- * Compute C = A*B for some subblocks of A, B, and C
+ * Compute C += A*B for some subblocks of A, B, and C
  */
 template <typename MatrixC>
 void my_dgemm_inner_kernel(int m, int n, int k,
@@ -217,7 +217,7 @@ static double A_pack[M_BLOCK*K_BLOCK];
 static double B_pack[N_BLOCK*K_BLOCK];
 
 /*
- * Compute C = A*B
+ * Compute C += A*B
  */
 void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
 {

@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <limits>
+#include <algorithm>
 
 #include <omp.h>
 

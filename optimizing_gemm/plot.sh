@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export GNUPLOT_PS_DIR="$HOME/miniconda/envs/sss/share/gnuplot/5.0/PostScript"
+export GNUPLOT_PS_DIR="$HOME/miniconda/envs/sss/share/gnuplot/4.6/PostScript"
 
 file1="plot_`echo $* | tr -d ' '`.ps"
 file2="plot_`echo $* | tr -d ' '`.pdf"

@@ -93,7 +93,7 @@ Now we see a much tighter disassembly (in fact, this is the entire loop body), i
 
 ## Step 5: Blocking for cache
 
-Although the manually vecrtorized code is very fast for small matrices (even faster than BLAS sometimes!), it falls behind for larger matrices. This is because the kernel has to wait while data is read in. If the data is not in the cache (preferably the lowest-level cache L1), then it may have to wait a long time, hurting performance. To keep data in cache better, the loops can be blocked. In this example, multiple loops are blocked such that various pieces of the matrices are kept in the L1, L2, and L3 caches:
+Although the manually vectorized code is very fast for small matrices (even faster than BLAS sometimes!), it falls behind for larger matrices. This is because the kernel has to wait while data is read in. If the data is not in the cache (preferably the lowest-level cache L1), then it may have to wait a long time, hurting performance. To keep data in cache better, the loops can be blocked. In this example, multiple loops are blocked such that various pieces of the matrices are kept in the L1, L2, and L3 caches:
 
 ![Step 5](figures/step5.png?raw=true)
 

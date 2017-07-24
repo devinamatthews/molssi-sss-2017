@@ -1,7 +1,7 @@
 SHELL=/bin/bash
 
 CXX=g++
-CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG
+CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG -I$(HOME)/miniconda/envs/sss/include
 LDFLAGS=-fopenmp -lopenblas -Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
 
 all: run

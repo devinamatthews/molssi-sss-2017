@@ -6,3 +6,4 @@ plot_*
 .cproject
 .settings
 ~*
+.DS_Store

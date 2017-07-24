@@ -1,6 +1,7 @@
 *.o
 *.x
 out_*
+plot_*
 .project
 .cproject
 .settings

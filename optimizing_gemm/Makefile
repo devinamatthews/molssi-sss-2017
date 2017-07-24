@@ -1,8 +1,8 @@
 SHELL=/bin/bash
 
 CXX=g++
-CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp
-LDFLAGS=-fopenmp -lopenblas
+CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG
+LDFLAGS=-fopenmp -lopenblas -Wl,-rpath,$(HOME)/anaconda/envs/sss/lib
 
 all: run
 
@@ -25,4 +25,7 @@ run: out_$(STEP) my_dgemm_$(STEP).o
 	else \
 		./plot.sh $$((STEP-1)) $(STEP); \
 	fi
-	
+
+clean:
+	rm *.o *.x out_* plot_*
+

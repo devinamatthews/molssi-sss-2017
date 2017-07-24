@@ -7,9 +7,7 @@
 
 #include <omp.h>
 
-#define EIGEN_USE_BLAS
-#define EIGEN_NO_DEBUG
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 using matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 

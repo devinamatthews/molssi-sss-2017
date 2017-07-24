@@ -2,7 +2,7 @@ SHELL=/bin/bash
 
 CXX=g++
 CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG
-LDFLAGS=-fopenmp -lopenblas -Wl,-rpath,$(HOME)/anaconda/envs/sss/lib
+LDFLAGS=-fopenmp -lopenblas -Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
 
 all: run
 

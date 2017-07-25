@@ -33,7 +33,15 @@ Prerequisites:
  - OpenBLAS (may also be changed in the Makefile)
  - Eigen v3
  - gnuplot
+ - ghostscript
  - Intel or AMD x86-64 processor with AVX (for the last example only, FMA support is required)
+
+In an anaconda environment, the additional requirements can be installed with:
+
+```bash
+conda install -c menpo -c bioconda eigen=3.2.7 gnuplot=4.6 openblas
+conda install -c conda-forge ghostscript
+```
 
 The various example implementations of GEMM are contained in the files `my_dgemm_<n>.cxx` where `n` is from 0 to 8. To compile and automatically run and plot the first "triple-loop" example, run the command:
 

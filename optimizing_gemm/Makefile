@@ -1,8 +1,13 @@
 SHELL=/bin/bash
 
+#OpenBLAS
+#BLAS_LIBS=-lopenblas
+#MKL
+BLAS_LIBS=-lmkl_intel_lp64 -lmkl_sequential -lmkl_core
+
 CXX=g++
 CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG -I$(HOME)/miniconda/envs/sss/include -Wno-depracated-declarations
-LDFLAGS=-fopenmp -lopenblas -Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
+LDFLAGS=-fopenmp $(BLAS_LIBS) -Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
 
 all: run
 

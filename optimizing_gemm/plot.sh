@@ -7,6 +7,8 @@ file2="plot_`echo $* | tr -d ' '`.pdf"
 command="set key top left
 set terminal postscript
 set output '$file1'
+set xlabel 'Matrix size (n)'
+set ylabel 'GFLOPs'
 set xrange [0:1000]
 set yrange [0:]
 plot 'out_blas' w lines title 'BLAS'"

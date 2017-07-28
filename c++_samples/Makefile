@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS=-std=c++11
-LDFLAGS=-Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
+LDFLAGS=-Wl,-rpath,$(CONDA_PREFIX)/lib
 
 all:
 

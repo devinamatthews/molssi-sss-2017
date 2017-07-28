@@ -6,8 +6,8 @@ SHELL=/bin/bash
 BLAS_LIBS=-lmkl_intel_lp64 -lmkl_sequential -lmkl_core
 
 CXX=g++
-CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG -I$(HOME)/miniconda/envs/sss/include -Wno-depracated-declarations
-LDFLAGS=-fopenmp $(BLAS_LIBS) -Wl,-rpath,$(HOME)/miniconda/envs/sss/lib
+CXXFLAGS=-std=c++11 -O3 -march=native -fopenmp -DNDEBUG -I$(CONDA_PREFIX)/include -Wno-depracated-declarations
+LDFLAGS=-fopenmp $(BLAS_LIBS) -Wl,-rpath,$(CONDA_PREFIX)/lib
 
 all: run
 

@@ -4,10 +4,10 @@
 #define N_UNROLL 8
 
 /*
- * Compute C += A*B for some subblocks of A, B, and C
+ * Compute C += A*B for some tiny subblocks of A, B, and C
  */
 template <typename MatrixA, typename MatrixB, typename MatrixC>
-void my_dgemm_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
+void my_dgemm_micro_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
 {
     /*
      * Step 3:
@@ -141,7 +141,7 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
             auto B_sub = B.block(0, j,        k, N_UNROLL);
             auto C_sub = C.block(i, j, M_UNROLL, N_UNROLL);
 
-            my_dgemm_kernel(k, A_sub, B_sub, C_sub);
+            my_dgemm_micro_kernel(k, A_sub, B_sub, C_sub);
         }
     }
 }

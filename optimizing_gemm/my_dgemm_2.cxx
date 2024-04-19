@@ -4,10 +4,10 @@
 #define N_UNROLL 8
 
 /*
- * Compute C += A*B for some subblocks of A, B, and C
+ * Compute C += A*B for some tiny subblocks of A, B, and C
  */
 template <typename MatrixA, typename MatrixB, typename MatrixC>
-void my_dgemm_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
+void my_dgemm_micro_kernel(int k, const MatrixA& A, const MatrixB& B, MatrixC& C)
 {
     for (int p = 0;p < k;p++)
     {
@@ -60,9 +60,9 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
 
     for (int p = 0;p < k;p++)
     {
-        for (int j = 0;j < n;j++)
+        for (int i = 0;i < m;i++)
         {
-            for (int i = 0;i < m;i++)
+            for (int j = 0;j < n;j++)
             {
                 //loop body
             }
@@ -71,15 +71,15 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
 
      * becomes
 
-    for (int p = 0;p < k;p++)
+    for (int i = 0;i < m;i += M_UNROLL)
     {
         for (int j = 0;j < n;j += N_UNROLL)
         {
-            for (int i = 0;i < m;i += M_UNROLL)
+            for (int p = 0;p < k;p++)
             {
-                for (int j = 0;j < N_UNROLL;j++)
+                for (int i = 0;i < M_UNROLL;i++)
                 {
-                    for (int i = 0;i < M_UNROLL;i++)
+                    for (int j = 0;j < N_UNROLL;j++)
                     {
                         //loop body
                     }
@@ -92,11 +92,11 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
      *         example, we've also changed the order of the loops slight and
      *         moved the inner remaining loop (over p) into a kernel.
 
-    for (int p = 0;p < k;p++)
+    for (int i = 0;i < m;i += M_UNROLL)
     {
         for (int j = 0;j < n;j += N_UNROLL)
         {
-            for (int i = 0;i < m;i += M_UNROLL)
+            for (int p = 0;p < k;p++)
             {
                 //loop body M_UNROLL*N_UNROLL times
             }
@@ -110,15 +110,15 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
      * Exercise: what happens when e.g. m%M_UNROLL != 0? How should the code
      * be amended to address this case?
      */
-    for (int j = 0;j < n;j += N_UNROLL)
+    for (int i = 0;i < m;i += M_UNROLL)
     {
-        for (int i = 0;i < m;i += M_UNROLL)
+        for (int j = 0;j < n;j += N_UNROLL)
         {
             auto A_sub = A.block(i, 0, M_UNROLL,        k);
             auto B_sub = B.block(0, j,        k, N_UNROLL);
             auto C_sub = C.block(i, j, M_UNROLL, N_UNROLL);
 
-            my_dgemm_kernel(k, A_sub, B_sub, C_sub);
+            my_dgemm_micro_kernel(k, A_sub, B_sub, C_sub);
         }
     }
 }

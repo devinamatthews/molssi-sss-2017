@@ -17,15 +17,13 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
         /*
          * ...because these two loops perform an outer product (rank-1 update).
          */
-        for (int j = 0;j < n;j++)
+        for (int i = 0;i < m;i++)
         {
             /*
-             * However, we've put the "i" loop innermost. When the data doesn't
-             * fit in cache, we waste bandwidth by moving more data than we
-             * need to.
-             *
-             * This is because elements of A and C in the m dimension aren't
-             * contiguous, and so don't fill up cache lines nicely.
+             * Here, we put the "j" loop innermost. This is because elements of B
+             * and C in the n dimension are contiguous, and so we will benefit from
+             * Re-using elements in the same cache line which have already been
+             * loaded into the cache.
              *
              * Note that different loop orderings can have a large effect on
              * performance, and may hurt or help depending on the problem size.
@@ -35,7 +33,7 @@ void my_dgemm(int m, int n, int k, const matrix& A, const matrix& B, matrix& C)
              * Exercise: what is the maximum reduction in bandwidth when we
              * reorder the loops to ensure contiguous access?
              */
-            for (int i = 0;i < m;i++)
+            for (int j = 0;j < n;j++)
             {
                 C(i,j) += A(i,p) * B(p,j);
             }

@@ -1,15 +1,19 @@
 #include "common.hpp"
 
-#include "immintrin.h"
 #include <stdint.h>
-
-#define M_BLOCK 72
-#define N_BLOCK 4080
-#define K_BLOCK 256
 
 #define M_UNROLL 6
 #define N_UNROLL 8
 #define K_UNROLL 4
+
+//prefetch A 12 outer products ahead ~= 60 cycles, which should be long enough to fetch data from L3
+#define A_PREFETCH_DISTANCE M_UNROLL*12
+
+#if defined(__x86_64__)
+
+#define M_BLOCK 72
+#define N_BLOCK 4080
+#define K_BLOCK 256
 
 /*
  * Compute C += A*B for some really tiny subblocks of A, B, and C
@@ -27,7 +31,7 @@ void my_dgemm_micro_kernel(int64_t k, const double* A, const double* B, MatrixC&
      * general case. HPC code (like GEMM) is not the usual case, and the
      * compiler can sometimes mess up even code with intrinsics badly.
      *
-     * Instead, we will simply translate the intrincis in Step 7 to inline
+     * Instead, we will simply translate the intrinsics in Step 7 to inline
      * assembly. Luckily, you don't have to optimize this far very often.
      *
      * The performance is *still* not quite up to BLAS, though. The last ~10-20%
@@ -244,6 +248,344 @@ void my_dgemm_micro_kernel(int64_t k, const double* A, const double* B, MatrixC&
       "memory"
     );
 }
+
+#elif defined(__aarch64__)
+
+#define M_BLOCK 240
+#define N_BLOCK 8184
+#define K_BLOCK 256
+
+/*
+ * Compute C += A*B for some subblocks of A, B, and C
+ */
+template <typename MatrixC>
+void my_dgemm_micro_kernel(int64_t k, const double* A, const double* B, MatrixC& C)
+{
+    double* C_ptr = C.data();
+    int64_t ldc = C.outerStride();
+
+    __asm__ volatile
+    (
+    "dup               v0.2d, xzr                \n\t" // zero out v0--v23
+    "dup               v1.2d, xzr                \n\t"
+    "dup               v2.2d, xzr                \n\t"
+    "dup               v3.2d, xzr                \n\t"
+    "dup               v4.2d, xzr                \n\t"
+    "dup               v5.2d, xzr                \n\t"
+    "dup               v6.2d, xzr                \n\t"
+    "dup               v7.2d, xzr                \n\t"
+    "dup               v8.2d, xzr                \n\t"
+    "dup               v9.2d, xzr                \n\t"
+    "dup              v10.2d, xzr                \n\t"
+    "dup              v11.2d, xzr                \n\t"
+    "dup              v12.2d, xzr                \n\t"
+    "dup              v13.2d, xzr                \n\t"
+    "dup              v14.2d, xzr                \n\t"
+    "dup              v15.2d, xzr                \n\t"
+    "dup              v16.2d, xzr                \n\t"
+    "dup              v17.2d, xzr                \n\t"
+    "dup              v18.2d, xzr                \n\t"
+    "dup              v19.2d, xzr                \n\t"
+    "dup              v20.2d, xzr                \n\t"
+    "dup              v21.2d, xzr                \n\t"
+    "dup              v22.2d, xzr                \n\t"
+    "dup              v23.2d, xzr                \n\t"
+    "                                            \n\t"
+    "ldr                  x4, %[k]               \n\t" // load k
+    "lsr              x4, x4, #2                 \n\t" // divide k by K_UNROLL
+    "                                            \n\t"
+    "ldr                  x0, %[a]               \n\t" // load address of a
+    "ldr                  x1, %[b]               \n\t" // load address of b
+    "                                            \n\t"
+    "ldr                  x2, %[c]               \n\t" // load address of c
+    "ldr                  x3, %[ldc]             \n\t" // load ldc
+    "lsl              x3, x3, #3                 \n\t" // ldc *= sizeof(double)
+    "                                            \n\t"
+    "lsl              x5, x3, #2                 \n\t" // x5 = 2*ldc
+    "add              x5, x5, x3                 \n\t" // x5 = 3*ldc
+    "add              x6, x5, x2                 \n\t" // x4 = c + 3*ldc
+    "                                            \n\t" // (i.e. &c(3,0))
+    "                                            \n\t"
+    "prfm          PLDL1KEEP, [x2]               \n\t" // prefetch c(0,0)
+    "prfm          PLDL1KEEP, [x6]               \n\t" // prefetch c(3,0)
+    "add              x5, x2, x3                 \n\t"
+    "add              x6, x6, x3                 \n\t"
+    "prfm          PLDL1KEEP, [x5]               \n\t" // prefetch c(1,0)
+    "prfm          PLDL1KEEP, [x6]               \n\t" // prefetch c(4,0)
+    "add              x5, x5, x3                 \n\t"
+    "add              x6, x6, x3                 \n\t"
+    "prfm          PLDL1KEEP, [x5]               \n\t" // prefetch c(2,0)
+    "prfm          PLDL1KEEP, [x6]               \n\t" // prefetch c(5,0)
+    "                                            \n\t"
+    "LDLOOPKITER%=:                              \n\t"
+    "                                            \n\t"
+    "prfm          PLDL1STRM, [x0, #72*8]        \n\t"
+    "                                            \n\t"
+    "ldr                 q24, [x1, #16*0]        \n\t" // iteration 0
+    "ldr                 q25, [x1, #16*1]        \n\t"
+    "ldr                 q26, [x1, #16*2]        \n\t"
+    "ldr                 q27, [x1, #16*3]        \n\t"
+    "                                            \n\t"
+    "ldr                 q28, [x0, #16*0]        \n\t"
+    "ldr                 q29, [x0, #16*1]        \n\t"
+    "ldr                 q30, [x0, #16*2]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v0, v24, v28[0]        \n\t"
+    "fmla.2d              v4, v24, v28[1]        \n\t"
+    "fmla.2d              v1, v25, v28[0]        \n\t"
+    "fmla.2d              v5, v25, v28[1]        \n\t"
+    "fmla.2d              v2, v26, v28[0]        \n\t"
+    "fmla.2d              v6, v26, v28[1]        \n\t"
+    "fmla.2d              v3, v27, v28[0]        \n\t"
+    "fmla.2d              v7, v27, v28[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v8, v24, v29[0]        \n\t"
+    "fmla.2d             v12, v24, v29[1]        \n\t"
+    "fmla.2d              v9, v25, v29[0]        \n\t"
+    "fmla.2d             v13, v25, v29[1]        \n\t"
+    "fmla.2d             v10, v26, v29[0]        \n\t"
+    "fmla.2d             v14, v26, v29[1]        \n\t"
+    "fmla.2d             v11, v27, v29[0]        \n\t"
+    "fmla.2d             v15, v27, v29[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d             v16, v24, v30[0]        \n\t"
+    "fmla.2d             v20, v24, v30[1]        \n\t"
+    "fmla.2d             v17, v25, v30[0]        \n\t"
+    "fmla.2d             v21, v25, v30[1]        \n\t"
+    "fmla.2d             v18, v26, v30[0]        \n\t"
+    "fmla.2d             v22, v26, v30[1]        \n\t"
+    "fmla.2d             v19, v27, v30[0]        \n\t"
+    "fmla.2d             v23, v27, v30[1]        \n\t"
+    "                                            \n\t"
+    "prfm          PLDL1STRM, [x0, #80*8]        \n\t"
+    "                                            \n\t"
+    "ldr                 q24, [x1, #16*4]        \n\t" // iteration 1
+    "ldr                 q25, [x1, #16*5]        \n\t"
+    "ldr                 q26, [x1, #16*6]        \n\t"
+    "ldr                 q27, [x1, #16*7]        \n\t"
+    "                                            \n\t"
+    "ldr                 q28, [x0, #16*3]        \n\t"
+    "ldr                 q29, [x0, #16*4]        \n\t"
+    "ldr                 q30, [x0, #16*5]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v0, v24, v28[0]        \n\t"
+    "fmla.2d              v4, v24, v28[1]        \n\t"
+    "fmla.2d              v1, v25, v28[0]        \n\t"
+    "fmla.2d              v5, v25, v28[1]        \n\t"
+    "fmla.2d              v2, v26, v28[0]        \n\t"
+    "fmla.2d              v6, v26, v28[1]        \n\t"
+    "fmla.2d              v3, v27, v28[0]        \n\t"
+    "fmla.2d              v7, v27, v28[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v8, v24, v29[0]        \n\t"
+    "fmla.2d             v12, v24, v29[1]        \n\t"
+    "fmla.2d              v9, v25, v29[0]        \n\t"
+    "fmla.2d             v13, v25, v29[1]        \n\t"
+    "fmla.2d             v10, v26, v29[0]        \n\t"
+    "fmla.2d             v14, v26, v29[1]        \n\t"
+    "fmla.2d             v11, v27, v29[0]        \n\t"
+    "fmla.2d             v15, v27, v29[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d             v16, v24, v30[0]        \n\t"
+    "fmla.2d             v20, v24, v30[1]        \n\t"
+    "fmla.2d             v17, v25, v30[0]        \n\t"
+    "fmla.2d             v21, v25, v30[1]        \n\t"
+    "fmla.2d             v18, v26, v30[0]        \n\t"
+    "fmla.2d             v22, v26, v30[1]        \n\t"
+    "fmla.2d             v19, v27, v30[0]        \n\t"
+    "fmla.2d             v23, v27, v30[1]        \n\t"
+    "                                            \n\t"
+    "prfm          PLDL1STRM, [x0, #88*8]         \n\t"
+    "                                            \n\t"
+    "ldr                 q24, [x1, #16*8]        \n\t" // iteration 2
+    "ldr                 q25, [x1, #16*9]        \n\t"
+    "ldr                 q26, [x1, #16*10]       \n\t"
+    "ldr                 q27, [x1, #16*11]       \n\t"
+    "                                            \n\t"
+    "ldr                 q28, [x0, #16*6]        \n\t"
+    "ldr                 q29, [x0, #16*7]        \n\t"
+    "ldr                 q30, [x0, #16*8]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v0, v24, v28[0]        \n\t"
+    "fmla.2d              v4, v24, v28[1]        \n\t"
+    "fmla.2d              v1, v25, v28[0]        \n\t"
+    "fmla.2d              v5, v25, v28[1]        \n\t"
+    "fmla.2d              v2, v26, v28[0]        \n\t"
+    "fmla.2d              v6, v26, v28[1]        \n\t"
+    "fmla.2d              v3, v27, v28[0]        \n\t"
+    "fmla.2d              v7, v27, v28[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v8, v24, v29[0]        \n\t"
+    "fmla.2d             v12, v24, v29[1]        \n\t"
+    "fmla.2d              v9, v25, v29[0]        \n\t"
+    "fmla.2d             v13, v25, v29[1]        \n\t"
+    "fmla.2d             v10, v26, v29[0]        \n\t"
+    "fmla.2d             v14, v26, v29[1]        \n\t"
+    "fmla.2d             v11, v27, v29[0]        \n\t"
+    "fmla.2d             v15, v27, v29[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d             v16, v24, v30[0]        \n\t"
+    "fmla.2d             v20, v24, v30[1]        \n\t"
+    "fmla.2d             v17, v25, v30[0]        \n\t"
+    "fmla.2d             v21, v25, v30[1]        \n\t"
+    "fmla.2d             v18, v26, v30[0]        \n\t"
+    "fmla.2d             v22, v26, v30[1]        \n\t"
+    "fmla.2d             v19, v27, v30[0]        \n\t"
+    "fmla.2d             v23, v27, v30[1]        \n\t"
+    "                                            \n\t"
+    "ldr                 q24, [x1, #16*12]       \n\t" // iteration 3
+    "ldr                 q25, [x1, #16*13]       \n\t"
+    "ldr                 q26, [x1, #16*14]       \n\t"
+    "ldr                 q27, [x1, #16*15]       \n\t"
+    "                                            \n\t"
+    "ldr                 q28, [x0, #16*9]        \n\t"
+    "ldr                 q29, [x0, #16*10]       \n\t"
+    "ldr                 q30, [x0, #16*11]       \n\t"
+    "                                            \n\t"
+    "fmla.2d              v0, v24, v28[0]        \n\t"
+    "fmla.2d              v4, v24, v28[1]        \n\t"
+    "fmla.2d              v1, v25, v28[0]        \n\t"
+    "fmla.2d              v5, v25, v28[1]        \n\t"
+    "fmla.2d              v2, v26, v28[0]        \n\t"
+    "fmla.2d              v6, v26, v28[1]        \n\t"
+    "fmla.2d              v3, v27, v28[0]        \n\t"
+    "fmla.2d              v7, v27, v28[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d              v8, v24, v29[0]        \n\t"
+    "fmla.2d             v12, v24, v29[1]        \n\t"
+    "fmla.2d              v9, v25, v29[0]        \n\t"
+    "fmla.2d             v13, v25, v29[1]        \n\t"
+    "fmla.2d             v10, v26, v29[0]        \n\t"
+    "fmla.2d             v14, v26, v29[1]        \n\t"
+    "fmla.2d             v11, v27, v29[0]        \n\t"
+    "fmla.2d             v15, v27, v29[1]        \n\t"
+    "                                            \n\t"
+    "fmla.2d             v16, v24, v30[0]        \n\t"
+    "fmla.2d             v20, v24, v30[1]        \n\t"
+    "fmla.2d             v17, v25, v30[0]        \n\t"
+    "fmla.2d             v21, v25, v30[1]        \n\t"
+    "fmla.2d             v18, v26, v30[0]        \n\t"
+    "fmla.2d             v22, v26, v30[1]        \n\t"
+    "fmla.2d             v19, v27, v30[0]        \n\t"
+    "fmla.2d             v23, v27, v30[1]        \n\t"
+    "                                            \n\t"
+    "add                   x0, x0, #8*6*4        \n\t" // a += M_UNROLL*K_UNROLL
+    "add                   x1, x1, #8*8*4        \n\t" // b += N_UNROLL*K_UNROLL
+    "                                            \n\t"
+    "sub                   x4, x4, #1            \n\t" // i -= 1;
+    "cmp                       x4, xzr           \n\t"
+    "b.ne    LDLOOPKITER%=                       \n\t" // iterate again if i != 0.
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v0            \n\t"
+    "fadd.2d             v25, v25, v1            \n\t"
+    "fadd.2d             v26, v26, v2            \n\t"
+    "fadd.2d             v27, v27, v3            \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+    "                                            \n\t"
+    "add                   x2, x2, x3            \n\t"
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v4            \n\t"
+    "fadd.2d             v25, v25, v5            \n\t"
+    "fadd.2d             v26, v26, v6            \n\t"
+    "fadd.2d             v27, v27, v7            \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+    "                                            \n\t"
+    "add                   x2, x2, x3            \n\t"
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v8            \n\t"
+    "fadd.2d             v25, v25, v9            \n\t"
+    "fadd.2d             v26, v26, v10           \n\t"
+    "fadd.2d             v27, v27, v11           \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+    "                                            \n\t"
+    "add                   x2, x2, x3            \n\t"
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v12           \n\t"
+    "fadd.2d             v25, v25, v13           \n\t"
+    "fadd.2d             v26, v26, v14           \n\t"
+    "fadd.2d             v27, v27, v15           \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+    "                                            \n\t"
+    "add                   x2, x2, x3            \n\t"
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v16           \n\t"
+    "fadd.2d             v25, v25, v17           \n\t"
+    "fadd.2d             v26, v26, v18           \n\t"
+    "fadd.2d             v27, v27, v19           \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+    "                                            \n\t"
+    "add                   x2, x2, x3            \n\t"
+    "                                            \n\t"
+    "ldr                      q24, [x2, #16*0]   \n\t"
+    "ldr                      q25, [x2, #16*1]   \n\t"
+    "ldr                      q26, [x2, #16*2]   \n\t"
+    "ldr                      q27, [x2, #16*3]   \n\t"
+    "fadd.2d             v24, v24, v20           \n\t"
+    "fadd.2d             v25, v25, v21           \n\t"
+    "fadd.2d             v26, v26, v22           \n\t"
+    "fadd.2d             v27, v27, v23           \n\t"
+    "str                      q24, [x2, #16*0]   \n\t"
+    "str                      q25, [x2, #16*1]   \n\t"
+    "str                      q26, [x2, #16*2]   \n\t"
+    "str                      q27, [x2, #16*3]   \n\t"
+
+    : // output operands (none)
+    : // input operands
+      [k]   "m" (k),
+      [a]   "m" (A),
+      [b]   "m" (B),
+      [c]   "m" (C_ptr),
+      [ldc] "m" (ldc)
+    : // register clobber list
+      "x0", "x1", "x2", "x3", "x4", "x5", "x6",
+      "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+      "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
+      "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+      "v24", "v25", "v26", "v27", "v28", "v29", "v30",
+      "memory"
+    );
+}
+
+#else
+
+#error "Unknown architecture"
+
+#endif
 
 /*
  * Compute C += A*B for some subblocks of A, B, and C
